@@ -27,7 +27,7 @@
 
 ## 📜 Riwayat Pembaruan
 
-Detail penjelasan pembaruan dan perbaikan pada setiap versi dapat Anda lihat pada berkas [CHANGELOG_PUBLIC.md](CHANGELOG_PUBLIC.md).
+Detail penjelasan pembaruan dan perbaikan pada setiap versi dapat Anda lihat pada berkas [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
