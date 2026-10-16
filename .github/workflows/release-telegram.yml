@@ -15,6 +15,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TELEGRAM_THREAD_ID: ${{ secrets.TELEGRAM_THREAD_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO_NAME: ${{ github.repository }}
           TAG_NAME: ${{ github.event.release.tag_name || 'v1.0.0-test' }}
           RELEASE_TITLE: ${{ github.event.release.name || 'Test Release Notification' }}
@@ -23,6 +24,7 @@ jobs:
           RELEASE_AUTHOR: ${{ github.event.release.author.login || github.actor }}
           IS_PRERELEASE: ${{ github.event.release.prerelease || false }}
           INCLUDE_ASSETS: true
+          RELEASE_ASSETS_JSON: ${{ toJson(github.event.release.assets) }}
           CUSTOM_TEMPLATE: |
             {badge}<b><a href="{url}">{repo}</a></b>
             
@@ -66,10 +68,81 @@ jobs:
           safe_title = html.escape(title)
           safe_author = html.escape(author)
 
-          if len(body) > 1500:
-              body = body[:1500] + '\n...(truncated)'
-          safe_body = html.escape(body)
-          zip_url = f'https://github.com/{repo}/archive/refs/tags/{tag}.zip' if tag else url
+          def format_release_notes(md_text):
+              if not md_text:
+                  return ''
+              if len(md_text) > 1500:
+                  md_text = md_text[:1500] + '\n...(truncated)'
+              lines = md_text.replace('\r\n', '\n').replace('\r', '\n').split('\n')
+              cleaned_lines = []
+              for line in lines:
+                  stripped = line.strip()
+                  if re.match(r'^(?:-{3,}|\*{3,}|_{3,})$', stripped):
+                      continue
+                  heading_match = re.match(r'^(#{1,6})\s+(.*)$', stripped)
+                  if heading_match:
+                      content = heading_match.group(2).strip()
+                      content = html.escape(content)
+                      content = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', content)
+                      cleaned_lines.append(f'<b>{content}</b>')
+                      continue
+                  list_match = re.match(r'^(\s*)[-*+]\s+(.*)$', line)
+                  if list_match:
+                      indent = list_match.group(1)
+                      content = list_match.group(2)
+                      content = html.escape(content)
+                      content = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', content)
+                      content = re.sub(r'__(.+?)__', r'<b>\1</b>', content)
+                      content = re.sub(r'`([^`]+)`', r'<code>\1</code>', content)
+                      content = re.sub(r'\[([^\]]+)\]\((https?://[^\)]+)\)', r'<a href="\2">\1</a>', content)
+                      bullet_indent = '  ' * (len(indent) // 2)
+                      cleaned_lines.append(f'{bullet_indent}• {content}')
+                      continue
+                  content = html.escape(line)
+                  content = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', content)
+                  content = re.sub(r'__(.+?)__', r'<b>\1</b>', content)
+                  content = re.sub(r'`([^`]+)`', r'<code>\1</code>', content)
+                  content = re.sub(r'\[([^\]]+)\]\((https?://[^\)]+)\)', r'<a href="\2">\1</a>', content)
+                  cleaned_lines.append(content)
+              return '\n'.join(cleaned_lines).strip()
+
+          safe_body = format_release_notes(body)
+
+          assets_raw = os.environ.get('RELEASE_ASSETS_JSON', '').strip()
+          assets = []
+          if assets_raw and assets_raw != 'null':
+              try:
+                  assets = json.loads(assets_raw)
+              except Exception:
+                  pass
+
+          if not assets and tag:
+              try:
+                  gh_token = os.environ.get('GITHUB_TOKEN', '').strip()
+                  api_headers = {'User-Agent': 'GithubNotifier'}
+                  if gh_token:
+                      api_headers['Authorization'] = f'Bearer {gh_token}'
+                  api_req = urllib.request.Request(f'https://api.github.com/repos/{repo}/releases/tags/{tag}', headers=api_headers)
+                  with urllib.request.urlopen(api_req) as resp:
+                      rel_data = json.loads(resp.read().decode())
+                      assets = rel_data.get('assets', [])
+              except Exception as e:
+                  print(f'::warning::Could not fetch release assets from GitHub API: {e}')
+
+          asset_url = ''
+          asset_name = ''
+          if assets and isinstance(assets, list):
+              zip_asset = next((a for a in assets if isinstance(a, dict) and a.get('name', '').lower().endswith('.zip')), None)
+              chosen = zip_asset if zip_asset else (assets[0] if isinstance(assets[0], dict) else None)
+              if chosen:
+                  asset_url = chosen.get('browser_download_url', '')
+                  asset_name = chosen.get('name', '')
+
+          if not asset_url:
+              asset_url = f'https://github.com/{repo}/archive/refs/tags/{tag}.zip' if tag else url
+              asset_name = f'{tag}.zip' if tag else 'Source.zip'
+
+          safe_asset_name = html.escape(asset_name)
 
           if custom_template:
               full_message = custom_template.replace('{repo}', safe_repo) \
@@ -81,7 +154,9 @@ jobs:
                                             .replace('{body}', safe_body) \
                                             .replace('{url}', url) \
                                             .replace('{badge}', badge) \
-                                            .replace('{download_zip}', zip_url)
+                                            .replace('{download_zip}', asset_url) \
+                                            .replace('{asset_url}', asset_url) \
+                                            .replace('{asset_name}', safe_asset_name)
           else:
               msg_parts = [
                   f'{badge}<b><a href="{url}">{safe_repo}</a></b>',
@@ -97,8 +172,8 @@ jobs:
                   msg_parts.extend(['', '📝 <b>Release Notes:</b>', f'<blockquote>{safe_body}</blockquote>'])
 
               links = [f'<a href="{url}">🔗 View Release</a>']
-              if include_assets and tag:
-                  links.append(f'<a href="{zip_url}">📥 Download .zip</a>')
+              if include_assets and asset_url:
+                  links.append(f'<a href="{asset_url}">📥 Download {safe_asset_name}</a>')
 
               msg_parts.extend(['', ' | '.join(links)])
               full_message = '\n'.join(msg_parts)
