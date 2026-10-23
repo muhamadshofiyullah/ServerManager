@@ -9,8 +9,8 @@
 - 💶 **Pemantauan Saldo Supplier**: Mengecek saldo supplier secara otomatis dan berkala. Dilengkapi fitur untuk mengaktifkan atau menonaktifkan supplier tertentu serta pembuatan tiket deposit otomatis saat saldo menipis.
 - 📊 **Laporan Harian (Daily Report)**: Rekapitulasi otomatis saldo bank, saldo supplier, saldo member, perkiraan modal, dan laba harian.
 - 🏦 **Manajemen Mutasi Bank**: Memantau transaksi masuk/keluar, saldo awal, dan saldo akhir bank secara otomatis.
-- 🏷️ **Update Harga Otomatis**: Memperbarui harga beli dan harga jual produk secara otomatis berdasarkan perubahan harga dari pihak supplier.
-- 🤖 **Integrasi Bot Telegram**: Menerima perintah cek saldo melalui Telegram secara *real-time*.
+- 🏷️ **Update Harga Otomatis**: Memperbarui harga beli dan harga jual produk secara otomatis berdasarkan perubahan harga dari pihak supplier, serta opsi sinkronisasi otomatis harga modal terendah langsung ke tabel produk.
+- 🤖 **Integrasi Bot Telegram**: Mengirimkan notifikasi saldo, peringatan deposit, serta menerima perintah cek saldo melalui Telegram secara *real-time*.
 
 ---
 
@@ -27,7 +27,7 @@
 
 ## 📜 Riwayat Pembaruan
 
-Detail penjelasan pembaruan dan perbaikan pada setiap versi dapat Anda lihat pada berkas [CHANGELOG.md](CHANGELOG.md).
+Detail penjelasan pembaruan dan perbaikan pada setiap versi dapat Anda lihat pada berkas [CHANGELOG_PUBLIC.md](CHANGELOG_PUBLIC.md).
 
 ---
 
